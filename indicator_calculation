@@ -1,0 +1,730 @@
+// Indicator Calculation
+
+
+let tab_Calculation = base.getTable("_calculation"); 
+let tab_disag = base.getTable("_survey_options");
+let tab_quarter = base.getTable("_reporting_periods");
+let tab_indicator = base.getTable("Indicators");
+let query_disag = await tab_disag.selectRecordsAsync({fields: [
+  "_survey_options_uid"
+]});
+let query_qua = await tab_quarter.selectRecordsAsync({fields: [
+  "ID"
+]});
+let query_ind = await tab_indicator.selectRecordsAsync({fields: [
+  "Unique Identifier"
+]});
+
+// Creation of the indicator, disaggregation, and reporting quarter list 
+let disag_list = {}; 
+for (let record of query_disag.records){
+  disag_list[record.name] = {id: record.id}
+};
+let qua_list ={};
+for (let record of query_qua.records){
+  qua_list[record.name] = {id: record.id}
+};
+let ind_list ={};
+for (let record of query_qua.records){
+  ind_list[record.name] = {id: record.id}
+};
+
+// Business Profile tables 
+let tab_busProfile = base.getTable("Business Profile [base]"); 
+let query_busProfile = await tab_busProfile.selectRecordsAsync({fields: [
+  "Business Tax ID",
+  "Entrepreneur or Business",
+  "Customer of FI",
+  "Co-investment amount (USD)",
+  "Female Owners",
+  "Grant amount (USD)",
+  "Male Owners",
+  "Percent Male Ownership",
+  "Percent Female Ownership",
+  "Percent Other Ownership",
+  "RP ID",
+  "RP ID_lookup",
+  "Sector Code",
+  "TN - Employees are Veterans (grant start)",
+  "TN - Employees internally displaced (grant start)",
+  "TN - Employees under 30 years old (grant start)",
+  "TN - Female Employees (grant start)",
+  "TN - FTE (grant start)",
+  "TN - Females in Management",
+  "TN - Males in Management",
+  "Ownership Results"
+]});
+
+// Business Profile Quarterly Data
+let tab_bpQuarterly = base.getTable("BP - Quarterly Report [base]"); 
+let query_bpQuarterly = await tab_bpQuarterly.selectRecordsAsync({fields: [
+  "Entity Type_lookup",
+  "Value of Export Sales Quarterly (UAH)",
+  "Value of Domestic Sales Quarterly (UAH)",
+  "Quarterly Net Profit (UAH)",
+  "RP ID",
+  "Reporting Year",
+  "Ownership Results_lookup",
+  "TN - FTE"
+]});
+
+let tab_busVulOwn = base.getTable("BP - Vulnerable Owners [repeat]");
+let query_busVulOwn = await tab_busVulOwn.selectRecordsAsync({fields: [
+  "Name (from Vulnerable Owner)",
+  "RP ID",
+  "Vulnerable Owner Percentage"
+]});
+
+let tab_busMSMEServices = base.getTable("BP - MSME Services [repeat]");
+let query_busMSMEServices = await tab_busMSMEServices.selectRecordsAsync({fields: [
+  "Service Received",
+  "_business_tax_id",
+  "RP ID"
+]});
+
+let tab_busFILoan = base.getTable("BP - FI Loan [repeat]");
+let query_busFILoan = await tab_busFILoan.selectRecordsAsync({fields: [
+  "Business_reg_ID",
+  "Agreement Number",
+  "Compensated Interest Rate",
+  "Financing Amount",
+  "Interest Rate (under agreement)",
+  "RP ID",
+  "Service Received",
+  "Standard Interest Rate",
+  "Created"
+]});
+
+let tab_busFILease = base.getTable("BP - FI Lease [repeat]");
+let query_busFILease = await tab_busFILease.selectRecordsAsync({fields: [
+  "Created",
+  "Financing Amount",
+  "RP ID",
+  "Service Received",
+  "Renumeration Paid by Client",
+  "Renumeration Paid by Leaser"
+]});
+
+let tab_busFIFactor = base.getTable("BP - FI Factor [repeat]"); 
+let query_busFIFactor = await tab_busFIFactor.selectRecordsAsync({fields: [
+  "Service Received",
+  "Created",
+  "Financing Amount",
+  "RP ID"
+]});
+
+// Business Profile Quarterly Data Calculation
+let bpq_indiv_rp1 = 0; 
+let bpq_indiv_rp2 = 0;
+let bpq_msme_rp1 = 0; 
+let bpq_msme_rp2 = 0; 
+let bpq_indiv_rp3 = 0; 
+let bpq_msme_rp3= 0; 
+let bpq_indiv_rp4 = 0; 
+let bpq_msme_rp4 = 0; 
+let bpq_export_rp1 = 0;
+let bpq_domestic_rp1 = 0;
+let bpq_export_rp2 = 0;
+let bpq_domestic_rp2 = 0;
+let bpq_export_rp3 = 0 ;
+let bpq_domestic_rp3 = 0;
+let bpq_export_rp4 = 0;
+let bpq_domestic_rp4 = 0;
+let bpq_male_rp1 = 0; 
+let bpq_female_rp1 = 0; 
+let bpq_both_rp1 = 0;
+let bpq_male_rp2 = 0; 
+let bpq_female_rp2 = 0; 
+let bpq_both_rp2 = 0;
+let bpq_male_rp3 = 0; 
+let bpq_female_rp3 = 0; 
+let bpq_both_rp3 = 0;
+let bpq_male_rp4 = 0; 
+let bpq_female_rp4 = 0; 
+let bpq_both_rp4 = 0;
+
+for (let record of query_bpQuarterly.records){
+  let entity_type = record.getCellValueAsString("Entity Type_lookup");
+   
+   // 5.2 Quarter 1
+  if (record.getCellValueAsString("RP ID") == "RP1"){
+     bpq_export_rp1 += record.getCellValue("Value of Export Sales Quarterly (UAH)");  
+     bpq_domestic_rp1 += record.getCellValue("Value of Domestic Sales Quarterly (UAH)"); 
+    
+    if(entity_type == "msme" ){bpq_msme_rp1 += 1;};
+    if(entity_type == "indiv" ){bpq_indiv_rp1 += 1;};
+
+    if (record.getCellValueAsString("Ownership Results_lookup") == "Male"){
+      bpq_male_rp1 += 1; 
+    };
+    if (record.getCellValueAsString("Ownership Results_lookup") == "Female"){
+      bpq_female_rp1 += 1; 
+    };
+    if (record.getCellValueAsString("Ownership Results_lookup") == "Both"){
+      bpq_both_rp1 += 1; 
+    };
+  };
+
+   // 5.2 Quarter 2
+  if (record.getCellValueAsString("RP ID") == "RP2"){
+    bpq_export_rp2 += record.getCellValue("Value of Export Sales Quarterly (UAH)");  
+    bpq_domestic_rp2 += record.getCellValue("Value of Domestic Sales Quarterly (UAH)");
+    
+    if(entity_type == "msme" ){bpq_msme_rp2 += 1;};
+    if(entity_type == "indiv" ){bpq_indiv_rp2 += 1;};
+
+    if (record.getCellValueAsString("Ownership Results_lookup") == "Male"){
+      bpq_male_rp2 += 1; 
+    };
+    if (record.getCellValueAsString("Ownership Results_lookup") == "Female"){
+      bpq_female_rp2 += 1; 
+    };
+    if (record.getCellValueAsString("Ownership Results_lookup") == "Both"){
+      bpq_both_rp2 += 1; 
+    };
+  };
+
+   // 5.2 Quarter 3
+  if (record.getCellValueAsString("RP ID") == "RP3"){
+    bpq_export_rp3 += record.getCellValue("Value of Export Sales Quarterly (UAH)");  
+    bpq_domestic_rp3 += record.getCellValue("Value of Domestic Sales Quarterly (UAH)"); 
+
+    if(entity_type == "msme" ){bpq_msme_rp3 += 1;};
+    if(entity_type == "indiv"){bpq_indiv_rp3 += 1;};
+
+    if (record.getCellValueAsString("Ownership Results_lookup") == "Male"){
+      bpq_male_rp3 += 1; 
+    };
+    if (record.getCellValueAsString("Ownership Results_lookup") == "Female"){
+      bpq_female_rp3 += 1; 
+    };
+    if (record.getCellValueAsString("Ownership Results_lookup") == "Both"){
+      bpq_both_rp3 += 1; 
+    };
+  };
+
+  // 5.2 Quarter 4
+  if (record.getCellValueAsString("RP ID") == "RP4"){
+    bpq_export_rp4 += record.getCellValue("Value of Export Sales Quarterly (UAH)");  
+    bpq_domestic_rp4 += record.getCellValue("Value of Domestic Sales Quarterly (UAH)"); 
+
+    if(entity_type == "msme" ){bpq_msme_rp4 += 1;};
+    if(entity_type == "indiv"){bpq_indiv_rp4 += 1;};
+
+    if (record.getCellValueAsString("Ownership Results_lookup") == "Male"){
+      bpq_male_rp4 += 1; 
+    };
+    if (record.getCellValueAsString("Ownership Results_lookup") == "Female"){
+      bpq_female_rp4 += 1; 
+    };
+    if (record.getCellValueAsString("Ownership Results_lookup") == "Both"){
+      bpq_both_rp4 += 1; 
+    };
+
+  };
+
+};
+
+// Business Profile Ownership Calculation 
+let own_male_rp1 = 0;
+let own_female_rp1 = 0; 
+let own_both_rp1 = 0; 
+let own_male_rp2 = 0;
+let own_female_rp2 = 0; 
+let own_both_rp2 = 0; 
+let own_male_rp3 = 0;
+let own_female_rp3 = 0; 
+let own_both_rp3 = 0; 
+let own_male_rp4 = 0;
+let own_female_rp4 = 0; 
+let own_both_rp4 = 0; 
+
+for (let record of query_busProfile.records){
+  if (record.getCellValueAsString("RP ID") == "RP1"){
+    if (record.getCellValueAsString("Ownership Results") == "Male"){
+      own_male_rp1 += 1; 
+    };
+    if (record.getCellValueAsString("Ownership Results") == "Female"){
+      own_female_rp1 += 1; 
+    };
+    if (record.getCellValueAsString("Ownership Results") == "Both"){
+      own_both_rp1 += 1; 
+    };
+  };
+
+  if (record.getCellValueAsString("RP ID") == "RP2"){
+    if (record.getCellValueAsString("Ownership Results") == "Male"){
+      own_male_rp2 += 1; 
+    };
+    if (record.getCellValueAsString("Ownership Results") == "Female"){
+      own_female_rp2 += 1; 
+    };
+    if (record.getCellValueAsString("Ownership Results") == "Both"){
+      own_both_rp2 += 1; 
+    };
+  };
+
+  if (record.getCellValueAsString("RP ID") == "RP3"){
+    if (record.getCellValueAsString("Ownership Results") == "Male"){
+      own_male_rp3 += 1; 
+    };
+    if (record.getCellValueAsString("Ownership Results") == "Female"){
+      own_female_rp3 += 1; 
+    };
+    if (record.getCellValueAsString("Ownership Results") == "Both"){
+      own_both_rp3 += 1; 
+    };
+  };
+
+  if (record.getCellValueAsString("RP ID") == "RP4"){
+    if (record.getCellValueAsString("Ownership Results") == "Male"){
+      own_male_rp4 += 1; 
+    };
+    if (record.getCellValueAsString("Ownership Results") == "Female"){
+      own_female_rp4 += 1; 
+    };
+    if (record.getCellValueAsString("Ownership Results") == "Both"){
+      own_both_rp4 += 1; 
+    };
+  };
+}
+
+
+// Services Recieved 
+let loans_rp1 = 0; 
+let factor_rp1 = 0; 
+let insur_rp1 = 0;
+let lease_rp1 = 0; 
+let loans_rp2 = 0; 
+let factor_rp2 = 0; 
+let insur_rp2 = 0;
+let lease_rp2 = 0; 
+let loans_rp3 = 0; 
+let factor_rp3 = 0; 
+let insur_rp3 = 0;
+let lease_rp3 = 0; 
+let loans_rp4 = 0; 
+let factor_rp4 = 0; 
+let insur_rp4 = 0;
+let lease_rp4 = 0; 
+let rp1_fOwner = 0; 
+let rp1_mOwner = 0; 
+
+//  Factoring Services Calculation
+for (let record of query_busFIFactor.records){
+  if (record.getCellValueAsString("RP ID") == "RP1"){
+    factor_rp1 +=1; 
+  };
+  if (record.getCellValueAsString("RP ID") == "RP2"){
+    factor_rp2 +=1;
+  };
+  if (record.getCellValueAsString("RP ID") == "RP3"){
+    factor_rp3 +=1;
+  };
+  if (record.getCellValueAsString("RP ID") == "RP4"){
+    factor_rp4 +=1;
+  };
+
+};
+
+//  Loan Services Calculation
+for (let record of query_busFILoan.records){
+  if (record.getCellValueAsString("RP ID") == "RP1"){
+    loans_rp1 +=1; 
+  };
+  if (record.getCellValueAsString("RP ID") == "RP2"){
+    loans_rp2 +=1;
+  };
+  if (record.getCellValueAsString("RP ID") == "RP3"){
+    loans_rp3 +=1;
+  };
+  if (record.getCellValueAsString("RP ID") == "RP4"){
+    loans_rp4 +=1;
+  };
+
+};
+
+//  Lease Services Calculation
+for (let record of query_busFILease.records){
+  if (record.getCellValueAsString("RP ID") == "RP1"){
+    lease_rp1 +=1; 
+  };
+  if (record.getCellValueAsString("RP ID") == "RP2"){
+    lease_rp2 +=1;
+  };
+  if (record.getCellValueAsString("RP ID") == "RP3"){
+    lease_rp3 +=1;
+  };
+  if (record.getCellValueAsString("RP ID") == "RP4"){
+    lease_rp4 +=1;
+  };
+
+};
+
+//Reporting Period 1 
+let rp1_msme = 0;
+let rp1_indiv = 0;
+let rp1_bank = 0; 
+let rp1_nonbank = 0; 
+let rp1_cnt = 0;
+let rp1_grant_amt = 0;
+let emp_cnt_rp1 = 0;
+
+for (let record of query_busProfile.records){
+  let bus_t = record.getCellValue('Entrepreneur or Business');
+  let period_t = record.getCellValue('RP ID_lookup');
+  let cusFI_t = record.getCellValue('Customer of FI');
+  let fte_cnt_t = record.getCellValue('TN - FTE (grant start)'); 
+
+  if(period_t[0].id == qua_list['RP1'].id){
+    rp1_cnt +=1; 
+    emp_cnt_rp1 +=fte_cnt_t;
+
+    if(bus_t[0].id == disag_list['msme'].id ){
+      rp1_msme += 1;};
+    if(bus_t[0].id == disag_list['indiv'].id ){
+      rp1_indiv += 1;};
+    if(cusFI_t[0].id == disag_list['0'].id){
+      rp1_nonbank += 1;};
+    if(cusFI_t[0].id == disag_list['1'].id){
+      rp1_bank += 1;};
+
+    rp1_grant_amt += record.getCellValue('Grant amount (USD)');
+  };
+};
+
+//Number of Full Time Employee Count 
+let emp_cnt_rp2 = 0;
+let emp_cnt_rp3 = 0;
+let emp_cnt_rp4 = 0;
+
+// Customer of FI 
+let fi_rp1 = 0; 
+let fi_rp2 = 0; 
+let fi_rp3 = 0;
+let fi_rp4 = 0; 
+
+for (let fiCount of query_busProfile.records){
+  let period = fiCount.getCellValue('RP ID_lookup');
+  let fte_cnt = fiCount.getCellValue('TN - FTE (grant start)');
+  
+  if(period[0].id == qua_list['RP1'].id){
+    emp_cnt_rp1 +=fte_cnt;
+  }
+
+  if(fiCount.getCellValueAsString("Customer of FI") =="1"){
+    if(fiCount.getCellValueAsString("RP ID") == "RP1"){
+      fi_rp1 +=1;
+    };
+    if(fiCount.getCellValueAsString("RP ID") == "RP2"){
+      fi_rp2 +=1;
+    };
+    if(fiCount.getCellValueAsString("RP ID") == "RP3"){
+      fi_rp3 +=1;
+    };
+    if(fiCount.getCellValueAsString("RP ID") == "RP4"){
+      fi_rp4 +=1;
+    };
+  }
+}
+
+
+//Reporting Period 2 
+let rp2_msme = 0;
+let rp2_indiv = 0;
+let rp2_bank = 0; 
+let rp2_nonbank = 0; 
+let rp2_fintech = 0;
+let rp2_mOwner = 0;
+let rp2_fOwner = 0;
+let avg_mOwn_rp2 = 0;
+let avg_fOwn_rp2 = 0;
+let ind3_1_rp2_val = 0;  
+let rp2_cnt = 0;
+let rp2_grant_amt = 0;
+
+for (let record of query_busProfile.records){
+  let bus_type = record.getCellValue('Entrepreneur or Business');
+  let period = record.getCellValue('RP ID_lookup');
+  let cusFI = record.getCellValue('Customer of FI');
+  let fte_cnt = record.getCellValue('TN - FTE (grant start)'); 
+
+  if(period[0].id == qua_list['RP2'].id){
+    rp2_cnt +=1; 
+    emp_cnt_rp2 +=fte_cnt;
+
+    if(bus_type[0].id == disag_list['msme'].id ){
+      rp2_msme += 1;};
+    if(bus_type[0].id == disag_list['indiv'].id ){
+      rp2_indiv += 1;};
+    if(cusFI[0].id == disag_list['0'].id){
+      rp2_nonbank += 1;};
+    if(cusFI[0].id == disag_list['1'].id){
+      rp2_bank += 1;};
+    rp2_mOwner += record.getCellValue('Percent Male Ownership');
+    rp2_fOwner += record.getCellValue('Percent Female Ownership');
+    rp2_grant_amt += record.getCellValue('Grant amount (USD)');
+  };
+};
+
+avg_mOwn_rp2 = rp2_mOwner/rp2_cnt;
+avg_fOwn_rp2 = rp2_fOwner/rp2_cnt;
+
+//console.log(rp2_bank);
+
+// Reporting Period 3 
+let rp3_grant_amt = 0;
+let rp3_msme = 0;
+let rp3_indiv = 0;
+let rp3_bank = 0; 
+let rp3_nonbank = 0; 
+let rp3_fintech = 0;
+let rp3_mOwner = 0;
+let rp3_fOwner = 0;
+let avg_mOwn_rp3 = 0;
+let avg_fOwn_rp3 = 0;
+let ind3_1_rp3_val = 0; 
+let rp3_cnt = 0;
+
+
+for (let record of query_busProfile.records){
+  let bus_type = record.getCellValue('Entrepreneur or Business');
+  let period = record.getCellValue('RP ID_lookup');
+  let cusFI = record.getCellValue('Customer of FI');
+  let fte_cnt = record.getCellValue('TN - FTE (grant start)');
+  
+  if(period[0].id == qua_list['RP3'].id){
+    rp3_cnt +=1;
+    emp_cnt_rp3 +=fte_cnt;
+
+    if(bus_type[0].id == disag_list['msme'].id ){
+      rp3_msme += 1;};
+    if(bus_type[0].id == disag_list['indiv'].id ){
+      rp3_indiv += 1;};
+    if(cusFI[0].id == disag_list['0'].id){
+      rp3_nonbank += 1;};
+    if(cusFI[0].id == disag_list['1'].id){
+      rp3_bank += 1;};
+    rp3_mOwner += record.getCellValue('Percent Male Ownership');
+    rp3_fOwner += record.getCellValue('Percent Female Ownership');
+    rp3_grant_amt += record.getCellValue('Grant amount (USD)');
+
+  };
+};
+avg_mOwn_rp3 = rp3_mOwner/rp3_cnt;
+avg_fOwn_rp3 = rp3_fOwner/rp3_cnt;
+
+//console.log(rp3_bank);
+
+//Reporting Period 4 
+let rp4_grant_amt = 0;
+let rp4_msme = 0;
+let rp4_indiv =0;
+let rp4_bank = 0; 
+let rp4_nonbank = 0; 
+let rp4_fintech = 0;
+let rp4_mOwner = 0;
+let rp4_fOwner = 0;
+let avg_mOwn_rp4 = 0;
+let avg_fOwn_rp4 = 0;
+let rp4_cnt = 0;
+let ind3_1_rp4_val = 0;
+
+for (let record of query_busProfile.records){
+  let bus_type = record.getCellValue('Entrepreneur or Business');
+  let period = record.getCellValue('RP ID_lookup');
+  let cusFI = record.getCellValue('Customer of FI');
+  let fte_cnt = record.getCellValue('TN - FTE (grant start)');
+
+  if(period[0].id == qua_list['RP4'].id){
+    rp4_cnt +=1; 
+    emp_cnt_rp4 +=fte_cnt;
+
+    if(bus_type[0].id == disag_list['msme'].id ){
+      rp4_msme += 1;};
+    if(bus_type[0].id == disag_list['indiv'].id ){
+      rp4_indiv += 1;};
+    if(cusFI[0].id == disag_list['0'].id){
+      rp4_nonbank += 1;};
+    if(cusFI[0].id == disag_list['1'].id){
+      rp4_bank += 1;};
+    rp4_mOwner += record.getCellValue('Percent Male Ownership');
+    rp4_fOwner += record.getCellValue('Percent Female Ownership');
+    rp4_grant_amt += record.getCellValue('Grant amount (USD)');
+
+  };
+};
+
+avg_mOwn_rp4 = rp4_mOwner/rp4_cnt;
+avg_fOwn_rp4 = rp4_fOwner/rp4_cnt;
+
+//console.log(avg_mOwn_rp4);
+
+//Updatng Indicator Calculation table with values
+let query_tab_Calculation = await tab_Calculation.selectRecordsAsync({fields: [
+  "_calculation_uid",
+  "link_Indicator",
+  "Disaggregates",
+  "Quarter",
+  'Actual',
+  "2024 Actual",
+  'actual_value'
+]});
+
+// Calculate Rolling Sum of Disaggregates
+let tot_year_msme = rp1_msme+rp2_msme+rp3_msme+rp4_msme;
+let tot_year_indiv = rp1_indiv+rp2_indiv+rp3_indiv+rp4_indiv;
+let tot_year_grant = rp1_grant_amt+rp2_grant_amt+rp3_grant_amt+rp4_grant_amt;
+let tot_year_bank = rp1_bank+rp2_bank+rp3_bank+rp4_bank;
+let tot_year_nonbank = rp1_nonbank+rp2_nonbank+rp3_nonbank+rp4_nonbank;
+let tot_year_fte = emp_cnt_rp1+emp_cnt_rp2+emp_cnt_rp3+emp_cnt_rp4;
+let tot_year_male_owner = own_male_rp1+own_male_rp2+own_male_rp3+own_male_rp4;
+let tot_year_female_owner = own_female_rp1+own_female_rp2+own_female_rp3+own_female_rp4;
+let tot_year_insur = insur_rp1+insur_rp2+insur_rp3+insur_rp4;;
+let tot_year_factor = factor_rp1+factor_rp2+factor_rp3+factor_rp4;
+let tot_year_lease = lease_rp1+lease_rp2+lease_rp3+lease_rp4;
+let tot_year_loan = loans_rp1+loans_rp2+loans_rp3+loans_rp4;
+let tot_year_cnt = rp1_cnt+rp2_cnt+rp3_cnt+rp4_cnt;
+let tot_year_fi = fi_rp1+fi_rp2+fi_rp3+fi_rp4;
+    // Calculate Rolling Sum of Indicator 5_3
+let tot_year_bpq_indiv = bpq_indiv_rp1+bpq_indiv_rp2+bpq_indiv_rp3+bpq_indiv_rp4;
+let tot_year_bpq_msme = bpq_msme_rp1+bpq_msme_rp2+bpq_msme_rp3+bpq_msme_rp4;
+let tot_year_bpq_export = bpq_export_rp1+bpq_export_rp2+bpq_export_rp3+bpq_export_rp4;
+let tot_year_bpq_domestic = bpq_domestic_rp1+bpq_domestic_rp2+bpq_domestic_rp3+bpq_domestic_rp4;
+let tot_year_bpq_male = bpq_male_rp1+bpq_male_rp2+bpq_male_rp3+bpq_male_rp4;
+let tot_year_bpq_female = bpq_female_rp1+bpq_female_rp2+bpq_female_rp3+bpq_female_rp4;
+
+for (let record of query_tab_Calculation.records){
+  if (record.getCellValueAsString('Disaggregates')=="msme"){
+    await tab_Calculation.updateRecordAsync(record, {
+      '2024 Actual': tot_year_msme+''
+    });
+  }
+
+  if (record.getCellValueAsString('Disaggregates')=="indiv"){
+    await tab_Calculation.updateRecordAsync(record, {
+      '2024 Actual': tot_year_indiv+''
+    });
+  }
+
+  if (record.getCellValueAsString('Disaggregates')=="bank"){
+    await tab_Calculation.updateRecordAsync(record, {
+      '2024 Actual': tot_year_bank+''
+    });
+  }
+  if (record.getCellValueAsString('Disaggregates')=="non_bank"){
+    await tab_Calculation.updateRecordAsync(record, {
+      '2024 Actual': tot_year_nonbank+''
+    });
+  }
+  if (record.getCellValueAsString('Disaggregates')=="factoring"){
+    await tab_Calculation.updateRecordAsync(record, {
+      '2024 Actual': tot_year_factor+''
+    });
+  }
+  if (record.getCellValueAsString('Disaggregates')=="leasing"){
+    await tab_Calculation.updateRecordAsync(record, {
+      '2024 Actual': tot_year_lease+''
+    });
+  }
+  if (record.getCellValueAsString('Disaggregates')=="insurance"){
+    await tab_Calculation.updateRecordAsync(record, {
+      '2024 Actual': tot_year_insur+''
+    });
+  }
+  if (record.getCellValueAsString('Disaggregates')=="loans"){
+    await tab_Calculation.updateRecordAsync(record, {
+      '2024 Actual': tot_year_loan+''
+    });
+  }
+  if (record.getCellValueAsString('Disaggregates')=="m_ownership"){
+    await tab_Calculation.updateRecordAsync(record, {
+      '2024 Actual': tot_year_male_owner+''
+    });
+  }
+
+  if (record.getCellValueAsString('Disaggregates')=="f_ownership"){
+    await tab_Calculation.updateRecordAsync(record, {
+      '2024 Actual': tot_year_female_owner+''
+    });
+  }
+
+  // Update Indicator Total Values for Year
+  if (record.getCellValueAsString('link_Indicator') == "3_1" && record.getCellValueAsString('Disaggregates')=="_val"){
+    await tab_Calculation.updateRecordAsync(record, {
+      '2024 Actual': '$'+tot_year_grant
+    });
+  }
+  if (record.getCellValueAsString('link_Indicator') == "3_2" && record.getCellValueAsString('Disaggregates')=="_val"){
+    await tab_Calculation.updateRecordAsync(record, {
+      '2024 Actual': tot_year_cnt+''
+    });
+  }
+
+  if (record.getCellValueAsString('link_Indicator') == "3_3" && record.getCellValueAsString('Disaggregates')=="_val"){
+    await tab_Calculation.updateRecordAsync(record, {
+      '2024 Actual': tot_year_fi+''
+    });
+  }
+  if (record.getCellValueAsString('link_Indicator') == "5_1" && record.getCellValueAsString('Disaggregates')=="_val"){
+    await tab_Calculation.updateRecordAsync(record, {
+      '2024 Actual': tot_year_fte+''
+    });
+  }
+  if (record.getCellValueAsString('link_Indicator') == "5_2" && record.getCellValueAsString('Disaggregates')=="_val"){
+    await tab_Calculation.updateRecordAsync(record, {
+      '2024 Actual': '$'+tot_year_grant
+    });
+    // Update indicator 5_2 values annually 
+    if (record.getCellValueAsString('Disaggregates')=="export"){
+      await tab_Calculation.updateRecordAsync(record, {
+        '2024 Actual': tot_year_bpq_export+''
+      });
+    }
+    if (record.getCellValueAsString('Disaggregates')=="domestic"){
+      await tab_Calculation.updateRecordAsync(record, {
+        '2024 Actual': tot_year_bpq_domestic+''
+      });
+    }
+    if (record.getCellValueAsString('Disaggregates')=="male"){
+      await tab_Calculation.updateRecordAsync(record, {
+        '2024 Actual': tot_year_bpq_male+''
+      });
+    }
+    if (record.getCellValueAsString('Disaggregates')=="female"){
+      await tab_Calculation.updateRecordAsync(record, {
+        '2024 Actual': tot_year_bpq_female+''
+      });
+    }    
+    if (record.getCellValueAsString('Disaggregates')=="indiv"){
+      await tab_Calculation.updateRecordAsync(record, {
+        '2024 Actual': tot_year_bpq_indiv+''
+      });
+    }    
+    if (record.getCellValueAsString('Disaggregates')=="msme"){
+      await tab_Calculation.updateRecordAsync(record, {
+        '2024 Actual': tot_year_bpq_msme+''
+      });
+    }    
+  }
+
+  if (record.getCellValueAsString('link_Indicator') == "5_3" && record.getCellValueAsString('Disaggregates')=="_val"){
+    await tab_Calculation.updateRecordAsync(record, {
+      '2024 Actual': tot_year_cnt+''
+    });
+  }
+}
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
